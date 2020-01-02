@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"sort"
 	"strings"
 )
@@ -17,6 +18,12 @@ import (
 // The methods interpret a Page dictionary stored in V.
 type Page struct {
 	V Value
+}
+
+var _debug = false
+
+func DebugEnable(enable bool) {
+	_debug = enable
 }
 
 // Page returns the page for the given page number.
@@ -178,7 +185,9 @@ func (f Font) getEncoder() TextEncoding {
 		case "Identity-H":
 			return f.charmapEncoding()
 		default:
-			println("unknown encoding", enc.Name())
+			if _debug {
+				fmt.Fprintln(os.Stderr, "unknown encoding", enc.Name())
+			}
 			return &nopEncoder{}
 		}
 	case Dict:
@@ -186,7 +195,9 @@ func (f Font) getEncoder() TextEncoding {
 	case Null:
 		return f.charmapEncoding()
 	default:
-		println("unexpected encoding", enc.String())
+		if _debug {
+			fmt.Fprintln(os.Stderr, "unexpected encoding", enc.String())
+		}
 		return &nopEncoder{}
 	}
 }
@@ -332,7 +343,9 @@ Parse:
 				}
 			}
 		}
-		println("no code space found")
+		if _debug {
+			fmt.Fprintln(os.Stderr, "no code space found")
+		}
 		r = append(r, noRune)
 		raw = raw[1:]
 	}
@@ -360,14 +373,18 @@ func readCmap(toUnicode Value) *cmap {
 			n = int(stk.Pop().Int64())
 		case "endcodespacerange":
 			if n < 0 {
-				println("missing begincodespacerange")
+				if _debug {
+					fmt.Fprintln(os.Stderr, "missing begincodespacerange")
+				}
 				ok = false
 				return
 			}
 			for i := 0; i < n; i++ {
 				hi, lo := stk.Pop().RawString(), stk.Pop().RawString()
 				if len(lo) == 0 || len(lo) != len(hi) {
-					println("bad codespace range")
+					if _debug {
+						fmt.Fprintln(os.Stderr, "bad codespace range")
+					}
 					ok = false
 					return
 				}
@@ -400,7 +417,9 @@ func readCmap(toUnicode Value) *cmap {
 			stk.Pop().Name() // key
 			stk.Push(value)
 		default:
-			println("interp\t", op)
+			if _debug {
+				fmt.Fprintln(os.Stderr, "interp\t", op)
+			}
 		}
 	})
 	if !ok {
@@ -885,7 +904,7 @@ func (p Page) Content() Content {
 			g.Tf = p.Font(f)
 			enc = g.Tf.Encoder()
 			if enc == nil {
-				println("no cmap for", f)
+				fmt.Fprintf(os.Stderr, "no cmap for", f)
 				enc = &nopEncoder{}
 			}
 			g.Tfs = args[1].Float64()
